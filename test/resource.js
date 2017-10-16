@@ -2,7 +2,7 @@
  * Resource tests
  */
 
-var koa = require('koa')
+var Koa = require('koa')
   , http = require('http')
   , request = require('supertest')
   , Resource = require('../lib/resource')
@@ -11,8 +11,8 @@ var koa = require('koa')
 describe('Resource', function() {
   it('creates new resource', function(done) {
     var resource = new Resource('forums', {
-      index: function *() {},
-      show: function *() {}
+      index: async () => {},
+      show: async () => {}
     });
     resource.should.be.have.type('object');
     resource.should.have.property('name', 'forums');
@@ -27,12 +27,12 @@ describe('Resource', function() {
   });
 
   it('ignores unsupported action object properties', function(done) {
-    var app = koa();
+    var app = new Koa();
 
     var users = new Resource('users', {
       invalid: true,
-      show: function *() {
-        this.status = 200;
+      show: async (ctx) => {
+        ctx.status = 200;
       }
     });
 
@@ -48,15 +48,15 @@ describe('Resource', function() {
   });
 
   it('maps "new" and "show" routes correctly', function(done) {
-    var app = koa();
+    var app = new Koa();
 
     (function firstOrder(next) {
       var users = new Resource('users', {
-        'new': function *() {
-          this.status = 500;
+        'new': async (ctx) => {
+          ctx.status = 500;
         },
-        show: function *() {
-          this.status = 200;
+        show: async (ctx) => {
+          ctx.status = 200;
         }
       });
 
@@ -83,11 +83,11 @@ describe('Resource', function() {
       if (err) return done(err);
 
       var users = new Resource('users', {
-        show: function *() {
-          this.status = 200;
+        show: async (ctx) => {
+          ctx.status = 200;
         },
-        'new': function *() {
-          this.status = 500;
+        'new': async (ctx) => {
+          ctx.status = 500;
         }
       });
 
@@ -113,17 +113,17 @@ describe('Resource', function() {
   });
 
   it('nests resources', function(done) {
-    var app = koa();
+    var app = new Koa();
     var forums = new Resource('forums', {
-      index: function *() {}
+      index: async () => {}
     });
     var threads = new Resource('threads', {
-      index: function *() {},
-      show: function *() {
-        should.exist(this.params);
-        this.params.should.have.property('forum', '54');
-        this.params.should.have.property('thread', '12');
-        this.status = 200;
+      index: async () => {},
+      show: async (ctx) => {
+        should.exist(ctx.params);
+        ctx.params.should.have.property('forum', '54');
+        ctx.params.should.have.property('thread', '12');
+        ctx.status = 200;
       }
     });
     forums.add(threads);
@@ -139,10 +139,10 @@ describe('Resource', function() {
   });
 
   it('options.methods overrides action methods', function(done) {
-    var app = koa();
+    var app = new Koa();
     app.use(Resource('users', {
-      update: function *() {
-        this.status = 200;
+      update: async (ctx) => {
+        ctx.status = 200;
       }
     }, {
       methods: {
@@ -159,12 +159,12 @@ describe('Resource', function() {
   });
 
   it('options.id overrides id parameter name', function(done) {
-    var app = koa();
+    var app = new Koa();
     app.use(Resource('users', {
-      show: function *() {
-        should.exist(this.params);
-        this.params.should.have.property('user_id', '123');
-        this.status = 200;
+      show: async (ctx) => {
+        should.exist(ctx.params);
+        ctx.params.should.have.property('user_id', '123');
+        ctx.status = 200;
       }
     }, {
       id: "user_id"
@@ -179,20 +179,20 @@ describe('Resource', function() {
   });
 
   it('composes both global and per function middleware', function(done) {
-    var app = koa();
+    var app = new Koa();
 
-    var preRequestMiddleware = function *(next) {
-      this.status = 200;
-      this.body = 'firstMiddleware';
-      yield next;
+    var preRequestMiddleware = async (ctx, next) =>{
+      ctx.status = 200;
+      ctx.body = 'firstMiddleware';
+      await next();
     };
 
     var actions = {
       show: [
-        function *() {
-          this.body += '|secondMiddleware';
+        async (ctx) => {
+          ctx.body += '|secondMiddleware';
         }, 
-        function *() {
+        async () => {
           
         }
       ]
@@ -209,17 +209,17 @@ describe('Resource', function() {
   });
 
   it('composes resource middleware for each action, even with a custom id param name', function(done) {
-    var app = koa();
+    var app = new Koa();
 
-    var preRequestMiddleware = function *(next) {
-      this.status = 200;
-      yield next;
+    var preRequestMiddleware = async (ctx, next) => {
+      ctx.status = 200;
+      await next();
     };
 
     var actions = {
-      show: function *() {
-        this.params.should.have.property('user_id', '1');
-        this.body = "yo";
+      show: async (ctx) => {
+        ctx.params.should.have.property('user_id', '1');
+        ctx.body = "yo";
       }
     };
 
@@ -238,10 +238,10 @@ describe('Resource', function() {
   });
 
   it('routes top-level resource', function(done) {
-    var app = koa();
+    var app = new Koa();
     app.use(Resource({
-      index: function *() {
-        this.status = 200;
+      index: async (ctx) => {
+        ctx.status = 200;
       }
     }).middleware());
     request(http.createServer(app.callback()))
@@ -254,10 +254,10 @@ describe('Resource', function() {
   });
 
   it('ignores query string', function(done) {
-    var app = koa();
+    var app = new Koa();
     app.use(Resource('users', {
-      index: function *() {
-        this.status = 200;
+      index: async (ctx) => {
+        ctx.status = 200;
       }
     }).middleware());
     request(http.createServer(app.callback()))
@@ -267,16 +267,16 @@ describe('Resource', function() {
   });
 
   it('responds to OPTIONS', function(done) {
-    var app = koa();
+    var app = new Koa();
     app.use(Resource('users', {
-      index: function *() {
-        this.status = 200;
+      index: async (ctx) => {
+        ctx.status = 200;
       },
-      read: function *() {
-        this.body = 'yo'
+      read: async (ctx) => {
+        ctx.body = 'yo'
       },
-      update: function *() {
-        this.body = 'yo'
+      update: async (ctx) => {
+        ctx.body = 'yo'
       }
     }).middleware());
     request(http.createServer(app.callback()))
@@ -287,13 +287,13 @@ describe('Resource', function() {
   });
 
   it('composes resource middleware for each action', function(done) {
-    var app = koa();
+    var app = new Koa();
 
-    app.use(Resource('users', function *(next) {
-      this.status = 200;
+    app.use(Resource('users', async (ctx, next) => {
+      ctx.status = 200;
     }, {
-      show: function *() {
-        this.body = 'yo';
+      show: async (ctx) => {
+        ctx.body = 'yo';
       }
     }).middleware());
 
@@ -304,12 +304,12 @@ describe('Resource', function() {
   });
 
   it('doesn\'t call multiple controller actions', function(done) {
-    var app = koa();
+    var app = new Koa();
     var counter = 0;
-    function *increaseCounter() {
+    const increaseCounter = async (ctx) => {
       counter++;
-      this.status = 204;
-    }
+      ctx.status = 204;
+    };
     app.use(Resource('threads', {
       index: increaseCounter,
       new: increaseCounter,
